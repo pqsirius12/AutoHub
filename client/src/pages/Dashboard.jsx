@@ -20,19 +20,25 @@ function Dashboard() {
                 const availableCars = cars.filter(c => c.availability === 'Available').length;
                 const activeBookings = bookings.length;
 
-                const todayStr = new Date().toISOString().split('T')[0];
+                // Use UTC for date comparisons to avoid timezone issues
+                const today = new Date();
+                const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+
                 const revenue = bookings.reduce((sum, b) => {
-                    if (b.status === 'Active' && b.startDate <= todayStr && b.endDate >= todayStr) {
-                        // Find car price. If not in booking (it should be in real app, but using logic from before)
-                        // Actually in db.js booking has totalPrice, but daily revenue needs logic.
-                        // The original log was:
-                        // const car = cars.find(c => c.id == b.carId);
-                        // return sum + (car ? (Number(car.pricePerDay) || 0) : 0);
-                        // However, let's keep it simple for now or fetch detailed logic.
-                        // We'll estimate daily revenue = total active bookings * average price?
-                        // No let's stick to original logic:
-                        const car = cars.find(c => c.id == b.carId);
-                        return sum + (car ? (Number(car.pricePerDay) || 0) : 0);
+                    if (b.status === 'Active') {
+                        // b.date is YYYY-MM-DD, parsing it creates a date at UTC midnight
+                        const startUTC = new Date(b.date);
+
+                        // Calculate end date based on duration (days)
+                        const endUTC = new Date(startUTC);
+                        endUTC.setDate(startUTC.getDate() + (b.days || 1));
+
+                        // Check if today is within [start, end)
+                        if (todayUTC >= startUTC && todayUTC < endUTC) {
+                            const car = cars.find(c => c.id == b.carId);
+                            // Use car price, fallback to booking details if necessary, but prompt asked for car daily rev
+                            return sum + (car ? (Number(car.pricePerDay) || 0) : 0);
+                        }
                     }
                     return sum;
                 }, 0);
